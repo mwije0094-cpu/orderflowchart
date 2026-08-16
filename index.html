@@ -117,7 +117,8 @@
      isBuyerMaker=false -> taker BOUGHT (aggressive buy)
    - Live updates via wss aggTrade stream for the forming candle
 ============================================================= */
-const REST = 'https://api.binance.com/api/v3';
+const REST = 'https://fapi.binance.com/fapi/v1';
+const WS_BASE = 'wss://fstream.binance.com/ws';
 let symbol = 'BTCUSDT';
 let interval = '15m';
 const LOOKBACK = 20;
@@ -324,7 +325,7 @@ function updateInfo(){
 function connectWS(){
   if(ws){ try{ ws.close(); }catch(e){} }
   statusEl.className='status'; statusEl.innerHTML='<span class="sp"></span>connecting…';
-  ws = new WebSocket(`wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@aggTrade`);
+  ws = new WebSocket(`${WS_BASE}/${symbol.toLowerCase()}@aggTrade`);
   ws.onopen = ()=>{ statusEl.className='status live'; statusEl.innerHTML='<span class="sp"></span>live trade stream'; };
   ws.onclose = ()=>{ statusEl.className='status'; statusEl.innerHTML='<span class="sp"></span>reconnecting…'; setTimeout(connectWS,2000); };
   ws.onerror = ()=> ws.close();
