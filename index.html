@@ -1,375 +1,2155 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>APEX Delta Bars | Order Flow</title>
-<style>
-  :root{
-    --bg-0:#070a10; --bg-1:#0d121b; --bg-2:#131a26; --line:#1e2733;
-    --text-hi:#e7edf5; --text-mid:#8a97a8; --text-low:#526073;
-    --buy:#2bd97c; --sell:#ff4d5e; --amber:#ffb020; --amber-dim:#5c4319;
-    --blue:#4fc3ff; --grey:#9aa6b5;
-    --mono:'IBM Plex Mono','Consolas',monospace; --sans:'Inter',-apple-system,sans-serif;
-  }
-  *{box-sizing:border-box; margin:0; padding:0;}
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-  html,body{ width:100%; height:100%; background:var(--bg-0); color:var(--text-hi); font-family:var(--sans); overflow:hidden; }
-  .app{ display:flex; flex-direction:column; height:100vh; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APEX DESK — Risk Management, DCA Calculator & Analysis Terminal</title>
+    <meta name="description" content="APEX DESK — a professional risk management and DCA recovery terminal for crypto futures traders. Size positions, plan recoveries, and share chart analysis with a live trading desk.">
+    <meta name="theme-color" content="#0a0b0d">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0b0d'/%3E%3Cpath d='M10 42 L24 26 L34 36 L54 14' stroke='%23f2a900' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M42 14 H54 V26' stroke='%23f2a900' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 
-  .topbar{ display:flex; align-items:center; gap:10px; height:44px; padding:0 12px; background:var(--bg-1); border-bottom:1px solid var(--line); flex-wrap:wrap; }
-  .brand{ font-weight:700; font-size:13px; display:flex; align-items:center; gap:6px; }
-  .brand .dot{ width:7px; height:7px; border-radius:50%; background:var(--buy); box-shadow:0 0 8px var(--buy); animation:pulse 1.6s infinite; }
-  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
-  select, .ctl-btn{ background:var(--bg-2); border:1px solid var(--line); border-radius:6px; padding:6px 10px; font-family:var(--mono); font-size:12px; color:var(--text-hi); cursor:pointer; }
-  .tf-group{ display:flex; gap:2px; background:var(--bg-2); border:1px solid var(--line); border-radius:6px; padding:2px; }
-  .tf-btn{ font-family:var(--mono); font-size:11px; color:var(--text-mid); background:transparent; border:none; padding:6px 9px; border-radius:4px; cursor:pointer; }
-  .tf-btn.active{ background:var(--amber-dim); color:var(--amber); }
-  .spacer{ flex:1; }
-  .status{ font-family:var(--mono); font-size:10.5px; color:var(--text-low); display:flex; align-items:center; gap:6px; white-space:nowrap; }
-  .status .sp{ width:6px; height:6px; border-radius:50%; background:var(--amber); }
-  .status.live .sp{ background:var(--buy); }
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  .infoline{ font-family:var(--mono); font-size:11px; color:var(--text-mid); padding:6px 14px; background:var(--bg-1); border-bottom:1px solid var(--line); display:flex; gap:16px; flex-wrap:wrap; }
-  .infoline b{ color:var(--text-hi); }
+    <!-- Bootstrap 5 CSS & Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
-  .chart-wrap{ flex:1; position:relative; min-height:0; }
-  #chart{ width:100%; height:100%; display:block; }
-  .loading{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:8px; background:rgba(7,10,16,0.88); font-family:var(--mono); color:var(--text-mid); font-size:12px; z-index:5; }
-  .loading .bar{ width:220px; height:4px; background:var(--bg-2); border-radius:2px; overflow:hidden; }
-  .loading .bar-fill{ height:100%; background:var(--amber); width:0%; transition:width .2s; }
+    <!-- Firebase Compat SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
-  .stats-wrap{ display:flex; border-top:1px solid var(--line); background:var(--bg-1); flex-shrink:0; height:150px; }
-  .stats-scroll{ flex:1; overflow-x:auto; overflow-y:hidden; }
-  .stats-table{ display:flex; height:100%; }
-  .stats-col{ width:105px; flex-shrink:0; border-right:1px solid rgba(255,255,255,0.03); }
-  .stats-labels{ width:100px; flex-shrink:0; }
-  .stat-cell{ height:30px; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:11px; font-weight:600; border-bottom:1px solid rgba(255,255,255,0.03); }
-  .stat-label{ height:30px; display:flex; align-items:center; padding-left:8px; font-family:var(--sans); font-size:10.5px; color:var(--text-mid); border-bottom:1px solid rgba(255,255,255,0.03); }
+    <style>
+        /* ============================================================
+           APEX DESK — design tokens
+           Base: graphite/carbon instrument panel, not navy-on-cyan.
+           Accent: phosphor amber (signature), teal-green for BUY,
+           coral for SELL. Display type: Space Grotesk. Body: Inter.
+           Data/tickers: JetBrains Mono (tabular figures).
+           ============================================================ */
+        :root {
+            --ink: #0a0b0d;
+            --ink-raised: #101215;
+            --panel: #14171a;
+            --panel-2: #191c20;
+            --border: #262b2f;
+            --border-soft: #1d2024;
+            --text: #e9e7e2;
+            --text-dim: #9aa0a6;
+            --text-faint: #5f666d;
+            --amber: #f2a900;
+            --amber-soft: rgba(242, 169, 0, 0.14);
+            --buy: #2dd4a7;
+            --buy-soft: rgba(45, 212, 167, 0.14);
+            --sell: #ff5470;
+            --sell-soft: rgba(255, 84, 112, 0.14);
+            --font-display: 'Space Grotesk', 'Inter', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+        }
 
-  ::-webkit-scrollbar{ height:7px; width:7px; }
-  ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:3px; }
-  ::-webkit-scrollbar-track{ background:transparent; }
-</style>
+        * { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--amber); }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            background-color: var(--ink);
+            background-image:
+                radial-gradient(ellipse 900px 500px at 15% -10%, rgba(242,169,0,0.05), transparent 60%),
+                radial-gradient(ellipse 700px 500px at 100% 0%, rgba(45,212,167,0.04), transparent 55%),
+                linear-gradient(var(--border-soft) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border-soft) 1px, transparent 1px);
+            background-size: auto, auto, 34px 34px, 34px 34px;
+            background-position: 0 0, 0 0, -1px -1px, -1px -1px;
+            color: var(--text);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            letter-spacing: 0.1px;
+        }
+
+        h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); letter-spacing: 0.2px; }
+
+        .accent-text { color: var(--amber); }
+
+        code, .font-monospace { font-family: var(--font-mono) !important; }
+
+        a { color: var(--amber); }
+        a:hover { color: #ffc247; }
+
+        /* ---------- Brand ---------- */
+        .brand-lockup { display: flex; align-items: center; gap: 12px; }
+        .brand-mark {
+            width: 38px; height: 38px; border-radius: 10px;
+            background: linear-gradient(145deg, #1a1d21, #101215);
+            border: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
+            position: relative; overflow: hidden; flex-shrink: 0;
+        }
+        .brand-mark::after {
+            content: ""; position: absolute; inset: 0;
+            background: linear-gradient(120deg, transparent 40%, rgba(242,169,0,0.25) 50%, transparent 60%);
+            transform: translateX(-100%);
+            animation: brand-sheen 5s ease-in-out infinite;
+        }
+        @keyframes brand-sheen { 0%, 60% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+        .brand-mark svg { position: relative; z-index: 1; }
+        .brand-name {
+            font-family: var(--font-display); font-weight: 700; font-size: 19px;
+            letter-spacing: 0.5px; line-height: 1.1; color: var(--text); margin: 0;
+        }
+        .brand-name span { color: var(--amber); }
+        .brand-tagline {
+            font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 1.6px;
+            text-transform: uppercase; color: var(--text-faint); margin: 0;
+        }
+
+        .status-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.5px;
+            color: var(--buy); background: var(--buy-soft);
+            border: 1px solid rgba(45,212,167,0.3);
+            padding: 5px 10px; border-radius: 20px;
+        }
+        .status-dot {
+            width: 7px; height: 7px; border-radius: 50%; background: var(--buy);
+            box-shadow: 0 0 0 0 rgba(45,212,167,0.6);
+            animation: pulse-dot 2s infinite;
+        }
+        @keyframes pulse-dot {
+            0% { box-shadow: 0 0 0 0 rgba(45,212,167,0.55); }
+            70% { box-shadow: 0 0 0 6px rgba(45,212,167,0); }
+            100% { box-shadow: 0 0 0 0 rgba(45,212,167,0); }
+        }
+
+        /* ---------- Cards & panels ---------- */
+        .card-custom {
+            background-color: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            position: relative;
+            box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 10px 30px -18px rgba(0,0,0,0.6);
+            animation: rise-in 0.45s ease both;
+        }
+        @keyframes rise-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .panel-heading {
+            display: flex; align-items: center; gap: 8px;
+            font-family: var(--font-display); font-weight: 600; font-size: 13px;
+            letter-spacing: 0.6px; text-transform: uppercase; color: var(--amber) !important;
+            margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-soft);
+        }
+        .panel-heading .bi { font-size: 14px; }
+
+        .form-control, .form-select {
+            background-color: var(--ink-raised) !important;
+            color: var(--text) !important;
+            border: 1px solid var(--border) !important;
+            font-family: var(--font-mono);
+            font-size: 13.5px;
+            border-radius: 7px;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: var(--ink-raised) !important;
+            color: var(--text) !important;
+            border-color: var(--amber) !important;
+            box-shadow: 0 0 0 3px var(--amber-soft) !important;
+        }
+        .form-control::placeholder { color: var(--text-faint) !important; font-family: var(--font-body); }
+
+        .form-label {
+            color: var(--text-dim) !important;
+            font-family: var(--font-mono);
+            font-weight: 500;
+            font-size: 11px;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .btn { border-radius: 7px; font-family: var(--font-display); letter-spacing: 0.3px; transition: transform 0.12s ease, filter 0.15s ease, box-shadow 0.15s ease; }
+        .btn:active { transform: translateY(1px); }
+
+        .btn-accent {
+            background: linear-gradient(180deg, #ffbe2e, var(--amber));
+            color: #1a1200;
+            font-weight: 700;
+            border: 1px solid #c98a00;
+            box-shadow: 0 6px 18px -8px rgba(242,169,0,0.55);
+        }
+        .btn-accent:hover { filter: brightness(1.06); color: #1a1200; box-shadow: 0 8px 22px -8px rgba(242,169,0,0.7); }
+        .btn-accent:disabled { opacity: 0.6; filter: none; box-shadow: none; }
+
+        .btn-warning-custom {
+            background: linear-gradient(180deg, #35e0b3, var(--buy));
+            color: #04241c;
+            font-weight: 700;
+            border: 1px solid #1fae86;
+            box-shadow: 0 6px 18px -8px rgba(45,212,167,0.5);
+        }
+        .btn-warning-custom:hover { filter: brightness(1.06); color: #04241c; }
+
+        .btn-outline-success { border-color: rgba(45,212,167,0.5); color: var(--buy); background: transparent; }
+        .btn-outline-success:hover { background: var(--buy-soft); color: var(--buy); border-color: var(--buy); }
+        .btn-outline-warning { border-color: rgba(242,169,0,0.5); color: var(--amber); background: transparent; }
+        .btn-outline-warning:hover { background: var(--amber-soft); color: var(--amber); border-color: var(--amber); }
+        .btn-outline-info { border-color: rgba(122,180,255,0.5); color: #7ab4ff; background: transparent; }
+        .btn-outline-info:hover { background: rgba(122,180,255,0.12); color: #7ab4ff; border-color: #7ab4ff; }
+        .btn-outline-danger { border-color: rgba(255,84,112,0.5); color: var(--sell); background: transparent; }
+        .btn-outline-danger:hover { background: var(--sell-soft); color: var(--sell); border-color: var(--sell); }
+
+        .btn-link.accent-text:hover { color: #ffc247 !important; }
+
+        /* ---------- Tabs ---------- */
+        .nav-tabs { border-bottom: 1px solid var(--border); gap: 4px; }
+        .nav-tabs .nav-link {
+            color: var(--text-dim);
+            background-color: var(--panel-2);
+            border: 1px solid var(--border-soft);
+            margin-right: 0;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            padding: 9px 13px;
+            font-family: var(--font-display);
+            font-size: 11.5px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            transition: color 0.15s ease, background-color 0.15s ease;
+        }
+        .nav-tabs .nav-link:hover { color: var(--text); }
+        .nav-tabs .nav-link.active {
+            color: #1a1200 !important;
+            background-color: var(--amber) !important;
+            border-color: var(--amber);
+            font-weight: 700;
+        }
+
+        .tab-pane-custom { display: none; }
+        .tab-pane-custom.active { display: block; animation: fade-in 0.25s ease both; }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+        #chart-card-wrapper { position: relative; }
+        #chart-container { height: 620px; width: 100%; border-radius: 8px; overflow: hidden; }
+
+        .fullscreen-chart {
+            position: fixed !important;
+            top: 0 !important; left: 0 !important;
+            width: 100vw !important; height: 100vh !important;
+            z-index: 9999 !important; padding: 0 !important;
+        }
+        .fullscreen-chart #chart-container { height: 100vh !important; }
+        .fullscreen-chart #coinglass-container { height: 100vh !important; }
+
+        /* Chart source toggle (TradingView / CoinGlass Legend) */
+        .chart-src-toggle {
+            display: flex; align-items: center; gap: 6px;
+            padding: 4px 4px 8px 4px; flex-wrap: wrap;
+        }
+        .chart-src-btn {
+            background: var(--panel-2, #191c20);
+            border: 1px solid var(--border, #262b2f);
+            color: var(--text-faint, #8a8f96);
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600; font-size: 12px;
+            padding: 6px 12px; border-radius: 6px;
+            cursor: pointer; transition: all .15s ease;
+        }
+        .chart-src-btn:hover { color: var(--text, #e9e7e2); border-color: #3a4046; }
+        .chart-src-btn.active {
+            background: #f2a900; color: #10120f; border-color: #f2a900;
+        }
+        .chart-src-url-wrap {
+            display: none;
+            align-items: center; gap: 6px;
+            margin-left: auto;
+        }
+        .chart-src-url-wrap.show { display: flex; }
+        .chart-src-url-wrap input {
+            background: var(--ink-raised, #101215);
+            border: 1px solid var(--border, #262b2f);
+            color: var(--text, #e9e7e2);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px; padding: 5px 8px; border-radius: 6px;
+            width: 230px; max-width: 40vw;
+        }
+        .chart-src-url-wrap button {
+            background: var(--panel-2, #191c20);
+            border: 1px solid var(--border, #262b2f);
+            color: var(--text, #e9e7e2);
+            font-size: 12px; padding: 5px 10px; border-radius: 6px; cursor: pointer;
+        }
+        .chart-src-url-wrap button:hover { border-color: #f2a900; color: #f2a900; }
+
+        #coinglass-container {
+            height: 620px; width: 100%; border-radius: 8px; overflow: hidden;
+            display: none; background: #0a0b0d;
+        }
+        #coinglass-container.active { display: block; }
+        #chart-container.hidden-src { display: none; }
+        #coinglass-container iframe { width: 100%; height: 100%; border: 0; display: block; }
+        .coinglass-fallback-note {
+            font-size: 11px; color: var(--text-faint, #8a8f96);
+            padding: 6px 4px 0 4px;
+        }
+
+        .offcanvas-custom {
+            background-color: var(--panel);
+            color: var(--text);
+            border-left: 1px solid var(--border);
+            width: 420px !important;
+            box-shadow: -20px 0 40px -20px rgba(0,0,0,0.6);
+        }
+        .offcanvas-header { border-bottom: 1px solid var(--border-soft); }
+        .offcanvas-title { font-family: var(--font-display); font-size: 15px; letter-spacing: 0.3px; }
+
+        /* History & Chat Boxes */
+        .history-box, .chat-box {
+            height: calc(100vh - 150px);
+            overflow-y: auto;
+            background-color: var(--ink-raised);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+        }
+        .chat-box {
+            height: calc(100vh - 170px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .history-card {
+            background-color: var(--panel-2);
+            border-left: 3px solid var(--buy);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            animation: rise-in 0.3s ease both;
+        }
+        .history-card.sell { border-left-color: var(--sell); }
+
+        .chat-msg {
+            background-color: var(--panel-2);
+            border: 1px solid var(--border-soft);
+            color: var(--text) !important;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            max-width: 85%;
+            word-wrap: break-word;
+            animation: rise-in 0.25s ease both;
+        }
+        .chat-msg.my-msg {
+            background-color: rgba(242,169,0,0.1);
+            border-color: rgba(242,169,0,0.35);
+            align-self: flex-end;
+        }
+        .chat-msg-time {
+            font-size: 10px;
+            color: var(--text-faint);
+            margin-left: 8px;
+            font-family: var(--font-mono, 'JetBrains Mono', monospace);
+            white-space: nowrap;
+        }
+        .chat-msg-top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        /* ---------- Notification Bell & Badges ---------- */
+        .nav-badge-wrap { position: relative; display: inline-flex; }
+        .nav-unread-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: var(--sell);
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1;
+            border-radius: 50px;
+            min-width: 17px;
+            height: 17px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+            border: 2px solid var(--ink);
+            font-family: var(--font-mono, monospace);
+        }
+        .notif-bell-btn {
+            position: relative;
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            color: var(--text);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .notif-bell-btn:hover { border-color: var(--amber); color: var(--amber); }
+        .notif-dropdown {
+            position: absolute;
+            top: 46px;
+            right: 0;
+            width: 320px;
+            max-height: 420px;
+            overflow-y: auto;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+            z-index: 2000;
+            padding: 6px;
+        }
+        .notif-item {
+            display: flex;
+            gap: 10px;
+            padding: 9px 8px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            cursor: pointer;
+        }
+        .notif-item:hover { background: var(--panel-2); }
+        .notif-item.unread { background: rgba(242,169,0,0.08); }
+        .notif-item .notif-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--amber); margin-top: 5px; flex-shrink: 0;
+        }
+        .notif-item.read .notif-dot { background: transparent; }
+        .notif-empty { text-align:center; color: var(--text-faint); font-size: 12px; padding: 24px 10px; }
+
+        /* ---------- PHASE 2 & 3 ---------- */
+        .online-pill {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(45,212,167,0.1); border: 1px solid rgba(45,212,167,0.3);
+            color: var(--buy); font-size: 11px; font-weight: 700; padding: 6px 10px; border-radius: 50px;
+        }
+        .online-pill .pulse-dot-live { width:7px; height:7px; border-radius:50%; background: var(--buy); animation: pulse-dot 1.4s infinite; }
+
+        .reaction-bar { display:flex; gap:5px; margin-top:6px; flex-wrap:wrap; }
+        .reaction-chip {
+            background: var(--panel); border: 1px solid var(--border-soft); color: var(--text-dim);
+            font-size: 11px; padding: 2px 7px; border-radius: 50px; cursor: pointer; display:inline-flex; gap:4px; align-items:center;
+        }
+        .reaction-chip:hover { border-color: var(--amber); }
+        .reaction-chip.reacted { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+        .reaction-add-btn { opacity: 0.5; }
+        .reaction-add-btn:hover { opacity: 1; }
+        .chat-msg-img { max-width: 100%; border-radius: 8px; margin-top: 6px; cursor: pointer; border: 1px solid var(--border); }
+
+        .search-box-wrap { position: relative; margin-bottom: 10px; }
+        .search-box-wrap input { padding-left: 32px !important; }
+        .search-box-wrap i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-faint); font-size: 13px; }
+
+        .tag-chip-row { display:flex; gap:6px; flex-wrap:wrap; margin-bottom: 10px; }
+        .tag-chip {
+            background: var(--panel-2); border: 1px solid var(--border-soft); color: var(--text-dim);
+            font-size: 11px; padding: 4px 10px; border-radius: 50px; cursor: pointer;
+        }
+        .tag-chip.active { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+        .analysis-tag-pill { font-size: 10px; background: var(--panel-2); border: 1px solid var(--border-soft); color: var(--text-dim); padding: 1px 7px; border-radius: 50px; margin-right: 4px; }
+
+        .alert-row {
+            background: var(--panel-2); border: 1px solid var(--border-soft); border-radius: 8px;
+            padding: 8px 10px; display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px; font-size: 12px;
+        }
+        .alert-row .badge-dir { font-family: var(--font-mono, monospace); }
+
+        /* ---------- Analysis feed ---------- */
+        .analysis-card {
+            background-color: var(--ink-raised);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 15px;
+            animation: rise-in 0.3s ease both;
+        }
+        .analysis-img {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: filter 0.15s ease;
+        }
+        .analysis-img:hover { filter: brightness(1.08); }
+        .comment-box {
+            background-color: var(--panel-2);
+            border-radius: 7px;
+            padding: 6px 9px;
+            font-size: 11.5px;
+            margin-top: 4px;
+        }
+
+        .avatar-img {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1.5px solid var(--amber);
+        }
+
+        .avatar-sm {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 1.5px solid var(--amber);
+        }
+
+        .badge { font-family: var(--font-mono); font-weight: 600; letter-spacing: 0.3px; border-radius: 5px; }
+        .bg-success { background-color: var(--buy) !important; color: #04241c !important; }
+        .bg-danger { background-color: var(--sell) !important; color: #2a0009 !important; }
+
+        /* ---------- Auth screen ---------- */
+        #auth-container { max-width: 440px; margin: 8vh auto; animation: rise-in 0.5s ease both; }
+        .auth-card { padding: 34px 32px !important; }
+        .auth-boot {
+            font-family: var(--font-mono); font-size: 11px; color: var(--text-faint);
+            letter-spacing: 0.4px; margin-bottom: 18px; padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-soft);
+        }
+        .auth-boot .bi { color: var(--buy); }
+        .auth-subtitle { color: var(--text-dim); font-size: 12.5px; text-align: center; margin-bottom: 22px; }
+        .input-with-icon { position: relative; }
+        .input-with-icon .bi {
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            color: var(--text-faint); font-size: 14px; pointer-events: none;
+        }
+        .input-with-icon .form-control { padding-left: 34px; }
+        .pw-toggle {
+            position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; color: var(--text-faint); font-size: 14px;
+            cursor: pointer; padding: 4px;
+        }
+        .pw-toggle:hover { color: var(--amber); }
+
+        #main-app-container { display: none; }
+
+        /* ---------- Top bar ---------- */
+        .top-bar {
+            border-bottom: 1px solid var(--border-soft);
+            padding-bottom: 14px;
+        }
+
+        .user-chip {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 10px 5px 6px; border-radius: 30px;
+            border: 1px solid var(--border-soft); background: var(--panel-2);
+            transition: border-color 0.15s ease;
+        }
+        .user-chip:hover { border-color: var(--amber); }
+
+        /* ---------- Toasts ---------- */
+        #toast-stack {
+            position: fixed; top: 16px; right: 16px; z-index: 10050;
+            display: flex; flex-direction: column; gap: 10px; width: min(340px, 90vw);
+        }
+        .apex-toast {
+            background: var(--panel); border: 1px solid var(--border);
+            border-left: 3px solid var(--amber);
+            border-radius: 8px; padding: 12px 14px;
+            font-size: 13px; color: var(--text);
+            box-shadow: 0 14px 30px -12px rgba(0,0,0,0.65);
+            animation: toast-in 0.25s ease both;
+            display: flex; gap: 10px; align-items: flex-start;
+        }
+        .apex-toast.success { border-left-color: var(--buy); }
+        .apex-toast.error { border-left-color: var(--sell); }
+        .apex-toast .bi { margin-top: 1px; }
+        .apex-toast.success .bi { color: var(--buy); }
+        .apex-toast.error .bi { color: var(--sell); }
+        .apex-toast.info .bi { color: var(--amber); }
+        .apex-toast.closing { animation: toast-out 0.2s ease both; }
+        @keyframes toast-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes toast-out { to { opacity: 0; transform: translateX(24px); } }
+
+        /* ---------- Misc ---------- */
+        hr.border-secondary { border-color: var(--border-soft) !important; opacity: 1; }
+        .text-muted { color: var(--text-faint) !important; }
+        .modal-content.card-custom { border-radius: 14px; }
+        .modal-header { border-bottom: 1px solid var(--border-soft) !important; }
+        ::selection { background: var(--amber-soft); color: var(--text); }
+    </style>
 </head>
-<body>
-<div class="app">
-  <div class="topbar">
-    <div class="brand"><span class="dot"></span>APEX DELTA BARS</div>
-    <select id="symSelect">
-      <option value="BTCUSDT">BTCUSDT</option>
-      <option value="ETHUSDT">ETHUSDT</option>
-      <option value="SOLUSDT">SOLUSDT</option>
-      <option value="XRPUSDT">XRPUSDT</option>
-      <option value="BNBUSDT">BNBUSDT</option>
-      <option value="DOGEUSDT">DOGEUSDT</option>
-    </select>
-    <div class="tf-group" id="tfGroup">
-      <button class="tf-btn" data-tf="1m">1m</button>
-      <button class="tf-btn" data-tf="5m">5m</button>
-      <button class="tf-btn active" data-tf="15m">15m</button>
-      <button class="tf-btn" data-tf="1h">1h</button>
-    </div>
-    <button class="ctl-btn" id="refreshBtn">⟲ Refresh</button>
-    <div class="spacer"></div>
-    <div class="status" id="statusEl"><span class="sp"></span>connecting…</div>
-  </div>
+<body class="p-3">
 
-  <div class="infoline" id="infoLine">
-    <span>Symbol <b id="infoSym">—</b></span>
-    <span>O <b id="infoO">—</b></span>
-    <span>H <b id="infoH">—</b></span>
-    <span>L <b id="infoL">—</b></span>
-    <span>C <b id="infoC">—</b></span>
-    <span>V <b id="infoV">—</b></span>
-    <span style="color:var(--text-low)">Real Binance klines + aggTrades — delta from taker buy/sell side</span>
-  </div>
+<div id="toast-stack"></div>
 
-  <div class="chart-wrap">
-    <canvas id="chart"></canvas>
-    <div class="loading" id="loadingEl">
-      <div>Fetching real market + trade data from Binance…</div>
-      <div class="bar"><div class="bar-fill" id="barFill"></div></div>
-      <div id="loadingSub" style="font-size:10.5px;color:var(--text-low);"></div>
-    </div>
-  </div>
+<!-- AUTH CONTAINER -->
+<div id="auth-container">
+    <div class="card card-custom auth-card shadow-lg">
+        <div class="brand-lockup justify-content-center mb-3">
+            <div class="brand-mark">
+                <svg width="20" height="20" viewBox="0 0 64 64" fill="none"><path d="M10 42 L24 26 L34 36 L54 14" stroke="#f2a900" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 14 H54 V26" stroke="#f2a900" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+                <p class="brand-name mb-0">APEX <span>DESK</span></p>
+                <p class="brand-tagline">RISK · DCA · SIGNALS</p>
+            </div>
+        </div>
 
-  <div class="stats-wrap">
-    <div class="stats-labels">
-      <div class="stat-label">Delta</div>
-      <div class="stat-label">Max Delta</div>
-      <div class="stat-label">Min Delta</div>
-      <div class="stat-label">Delta Chg</div>
-      <div class="stat-label">Volume</div>
+        <div class="auth-boot">
+            <div><i class="bi bi-check-circle-fill"></i> Market feed handshake OK</div>
+            <div><i class="bi bi-check-circle-fill"></i> Secure session channel ready</div>
+            <div><i class="bi bi-terminal"></i> Awaiting trader credentials<span style="animation:pulse-dot 1.2s steps(2) infinite;">_</span></div>
+        </div>
+
+        <h4 class="text-center accent-text mb-1" id="auth-title" style="font-size:17px;">🔐 USER LOGIN</h4>
+        <p class="auth-subtitle">Sign in to access your trading desk</p>
+        <div id="auth-alert" class="alert alert-danger d-none p-2 small"></div>
+        <form id="auth-form" onsubmit="handleAuth(event)">
+            <div class="mb-3 d-none" id="username-field-group">
+                <label class="form-label">Username</label>
+                <div class="input-with-icon">
+                    <i class="bi bi-person"></i>
+                    <input type="text" id="auth-username" class="form-control" placeholder="e.g. TraderJohn">
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Email Address</label>
+                <div class="input-with-icon">
+                    <i class="bi bi-envelope"></i>
+                    <input type="email" id="auth-email" class="form-control" placeholder="name@example.com" required>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <div class="input-with-icon">
+                    <i class="bi bi-lock"></i>
+                    <input type="password" id="auth-password" class="form-control" placeholder="••••••••" required minlength="6" style="padding-right:34px;">
+                    <button type="button" class="pw-toggle" onclick="togglePasswordVisibility()"><i class="bi bi-eye" id="pw-toggle-icon"></i></button>
+                </div>
+            </div>
+            <button type="submit" id="auth-submit-btn" class="btn btn-accent w-100 py-2 mb-3">LOGIN</button>
+        </form>
+        <div class="text-center">
+            <button type="button" class="btn btn-link accent-text small p-0 text-decoration-none" onclick="toggleAuthMode()">Toggle Register / Login</button>
+        </div>
     </div>
-    <div class="stats-scroll" id="statsScroll">
-      <div class="stats-table" id="statsTable"></div>
-    </div>
-  </div>
 </div>
 
+<!-- MAIN APP CONTAINER -->
+<div class="container-fluid" id="main-app-container">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-3 top-bar">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+            <div class="brand-lockup">
+                <div class="brand-mark">
+                    <svg width="20" height="20" viewBox="0 0 64 64" fill="none"><path d="M10 42 L24 26 L34 36 L54 14" stroke="#f2a900" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><path d="M42 14 H54 V26" stroke="#f2a900" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div>
+                    <p class="brand-name mb-0">APEX <span>DESK</span></p>
+                    <p class="brand-tagline">RISK · DCA · ANALYSIS TERMINAL</p>
+                </div>
+            </div>
+            <span class="status-pill d-none d-lg-inline-flex"><span class="status-dot"></span> LIVE MARKET FEED</span>
+            <span class="online-pill" id="online-users-pill"><span class="pulse-dot-live"></span> <span id="online-users-count">1</span> online</span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="user-chip cursor-pointer" onclick="openProfileModal()" style="cursor: pointer;">
+                <img id="user-avatar-display" src="" class="avatar-img" alt="Avatar">
+                <span class="small d-none d-md-inline"><span id="user-email-display" class="text-white fw-bold"></span></span>
+            </div>
+
+            <div class="nav-badge-wrap">
+                <button class="btn btn-outline-success btn-sm fw-bold px-3 py-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#analysisOffcanvas" id="analysis-feed-btn">
+                    <i class="bi bi-graph-up-arrow"></i> ANALYSIS FEED
+                </button>
+                <span class="nav-unread-badge d-none" id="analysis-unread-badge">0</span>
+            </div>
+            <div class="nav-badge-wrap">
+                <button class="btn btn-outline-warning btn-sm fw-bold px-3 py-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#chatOffcanvas" id="chat-feed-btn">
+                    <i class="bi bi-chat-dots"></i> PUBLIC CHAT
+                </button>
+                <span class="nav-unread-badge d-none" id="chat-unread-badge">0</span>
+            </div>
+            <button class="btn btn-outline-info btn-sm fw-bold px-3 py-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#historyOffcanvas">
+                <i class="bi bi-clock-history"></i> SIGNALS HISTORY
+            </button>
+
+            <div class="nav-badge-wrap">
+                <button class="notif-bell-btn" type="button" id="notif-bell-btn" onclick="toggleNotifDropdown()">
+                    <i class="bi bi-bell-fill"></i>
+                </button>
+                <span class="nav-unread-badge d-none" id="notif-bell-badge">0</span>
+                <div class="notif-dropdown d-none" id="notif-dropdown-list">
+                    <div class="notif-empty">Loading...</div>
+                </div>
+            </div>
+
+            <button class="btn btn-outline-danger btn-sm fw-bold py-2" onclick="logoutUser()"><i class="bi bi-box-arrow-right"></i> Logout</button>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- 1. Left: TradingView Chart -->
+        <div class="col-xl-9 col-lg-8 col-12">
+            <div class="card card-custom p-2 h-100" id="chart-card-wrapper">
+                <div class="chart-src-toggle">
+                    <button type="button" class="chart-src-btn active" id="btn-src-tv" onclick="switchChartSource('tv')">
+                        <i class="bi bi-graph-up"></i> TradingView
+                    </button>
+                    <button type="button" class="chart-src-btn" id="btn-src-cg" onclick="switchChartSource('cg')">
+                        <i class="bi bi-fire"></i> CoinGlass Legend
+                    </button>
+                    <div class="chart-src-url-wrap" id="cg-url-wrap">
+                        <input type="text" id="cg-url-input" placeholder="Paste CoinGlass Legend share link..." value="https://legend.coinglass.com/chart/53d8ff409b67418ab8982312886f4e69">
+                        <button type="button" onclick="loadCoinglassChart()">Load</button>
+                    </div>
+                </div>
+                <div id="chart-container"></div>
+                <div id="coinglass-container"></div>
+                <div class="coinglass-fallback-note" id="cg-fallback-note" style="display:none;">
+                    Chart එක load වෙන්නෙ නැත්නම් CoinGlass එකෙන් iframe embed එක block කරලා කියන එකයි —
+                    <a href="#" id="cg-open-newtab" target="_blank" rel="noopener" style="color:#f2a900;">මෙතනින් අලුත් tab එකක open කරන්න</a>.
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Right: Calculator Panel & Share Analysis Form -->
+        <div class="col-xl-3 col-lg-4 col-12">
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item">
+                    <button class="nav-link active" id="btn-live-tab" onclick="switchTab('live-panel', 'btn-live-tab')">🚀 RISK + DCA CALC</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="btn-dca-tab" onclick="switchTab('dca-panel', 'btn-dca-tab')">🧮 DCA ONLY</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="btn-share-tab" onclick="switchTab('share-panel', 'btn-share-tab')">📤 SHARE ANALYSIS</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="btn-alert-tab" onclick="switchTab('alert-panel', 'btn-alert-tab')">🔔 PRICE ALERTS</button>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <!-- RISK MANAGEMENT + DCA CALCULATOR PANEL -->
+                <div class="tab-pane-custom active" id="live-panel">
+                    <div class="card card-custom p-3">
+                        <h6 class="panel-heading"><i class="bi bi-broadcast"></i> TRADE SIGNAL <span style="text-transform:none;font-weight:400;color:var(--text-faint);">— Public Binance Data</span></h6>
+                        
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label">Coin Symbol</label>
+                                <input type="text" id="symbol" class="form-control" value="BTCUSDT" oninput="updateChartSymbol(this.value.toUpperCase())">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Signal Type</label>
+                                <select id="signal" class="form-select">
+                                    <option value="BUY">BUY 🟢</option>
+                                    <option value="SELL">SELL 🔴</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label">Stop Loss (SL = DCA P3)</label>
+                                <input type="number" step="any" id="sl" class="form-control" value="95000">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Take Profit (TP)</label>
+                                <input type="number" step="any" id="tp" class="form-control" placeholder="Auto via RR">
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-4">
+                                <label class="form-label">RR Ratio</label>
+                                <input type="number" step="any" id="rr" class="form-control" value="2">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">Risk ($)</label>
+                                <input type="number" step="any" id="risk" class="form-control" value="1">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">Leverage</label>
+                                <input type="number" id="leverage" class="form-control" value="20">
+                            </div>
+                        </div>
+
+                        <hr class="my-3 border-secondary">
+                        <h6 class="panel-heading"><i class="bi bi-arrow-repeat"></i> DCA RECOVERY</h6>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">DCA Target Exit (P2)</label>
+                                <input type="number" step="any" id="dca_p2" class="form-control" value="98000">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Desired Profit ($)</label>
+                                <input type="number" step="any" id="dca_profit" class="form-control" value="5.0">
+                            </div>
+                        </div>
+
+                        <button class="btn btn-accent w-100 py-2 mb-2" onclick="processLiveSignal()">📤 CALCULATE & SEND</button>
+                    </div>
+                </div>
+
+                <!-- DCA ONLY PANEL -->
+                <div class="tab-pane-custom" id="dca-panel">
+                    <div class="card card-custom p-3">
+                        <h6 class="panel-heading"><i class="bi bi-calculator"></i> DCA ONLY ALERT</h6>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label">Coin Symbol</label>
+                                <input type="text" id="do_symbol" class="form-control" value="BTCUSDT">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Signal Type</label>
+                                <select id="do_signal" class="form-select">
+                                    <option value="BUY">BUY 🟢</option>
+                                    <option value="SELL">SELL 🔴</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label">Entry Price (P1)</label>
+                                <input type="number" step="any" id="do_p1" class="form-control" placeholder="e.g. 64000">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">1st Margin Size (S1 $)</label>
+                                <input type="number" step="any" id="do_s1" class="form-control" placeholder="e.g. 10">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label">DCA Entry (P3)</label>
+                                <input type="number" step="any" id="do_p3" class="form-control" placeholder="e.g. 63000">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">DCA Target Exit (P2)</label>
+                                <input type="number" step="any" id="do_p2" class="form-control" placeholder="e.g. 63500">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Desired Profit ($)</label>
+                            <input type="number" step="any" id="do_profit" class="form-control" value="5.0">
+                        </div>
+                        <button class="btn btn-warning-custom w-100 py-2" onclick="processDcaOnlySignal()">📤 CALCULATE</button>
+                    </div>
+                </div>
+
+                <!-- PRICE ALERTS PANEL -->
+                <div class="tab-pane-custom" id="alert-panel">
+                    <div class="card card-custom p-3 mb-3">
+                        <h6 class="panel-heading"><i class="bi bi-bell"></i> NEW PRICE ALERT</h6>
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <label class="form-label">Coin Symbol</label>
+                                <input type="text" id="alert-symbol" class="form-control" placeholder="BTCUSDT" value="BTCUSDT">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Direction</label>
+                                <select id="alert-direction" class="form-select">
+                                    <option value="above">Price goes ABOVE ▲</option>
+                                    <option value="below">Price goes BELOW ▼</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Target Price</label>
+                            <input type="number" step="any" id="alert-target" class="form-control" placeholder="e.g. 100000">
+                        </div>
+                        <button class="btn btn-accent w-100 py-2" onclick="createPriceAlert()">🔔 SET ALERT</button>
+                        <p class="small text-faint mt-2 mb-0"><i class="bi bi-info-circle"></i> Alerts only trigger while this browser tab is open and connected — checked every ~20 seconds against live Binance Futures mark price.</p>
+                    </div>
+                    <div class="card card-custom p-3">
+                        <h6 class="panel-heading"><i class="bi bi-list-check"></i> MY ACTIVE ALERTS</h6>
+                        <div id="alerts-list-container"><p class="small text-faint">No active alerts yet.</p></div>
+                    </div>
+                </div>
+
+                <!-- SHARE ANALYSIS PANEL -->
+                <div class="tab-pane-custom" id="share-panel">
+                    <div class="card card-custom p-3">
+                        <h6 class="panel-heading"><i class="bi bi-cloud-upload"></i> UPLOAD & SHARE ANALYSIS</h6>
+                        <form onsubmit="uploadAndPostAnalysis(event)">
+                            <div class="mb-2">
+                                <label class="form-label">Symbol & Bias</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" id="post-symbol" class="form-control" placeholder="BTCUSDT" required>
+                                    <select id="post-bias" class="form-select">
+                                        <option value="BULLISH">🟢 Bullish</option>
+                                        <option value="BEARISH">🔴 Bearish</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Analysis Notes</label>
+                                <textarea id="post-notes" class="form-control form-control-sm" rows="3" placeholder="SMC Liquidity grab at 63.5k..." required></textarea>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label">Tags <span class="text-faint" style="font-size:10px;">(comma separated e.g. Scalp, SMC, Breakout)</span></label>
+                                <input type="text" id="post-tags" class="form-control form-control-sm" placeholder="Scalp, SMC, 15m">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Chart Screenshot (Paste Ctrl+V or Select File)</label>
+                                <div id="paste-target-zone" tabindex="0" class="border rounded p-3 text-center mb-2" style="background-color: #0e1621; border-style: dashed !important; border-color: #00d4ff !important;">
+                                    <i class="bi bi-clipboard-plus text-info fs-3"></i>
+                                    <p class="small text-muted mb-0">Click here & Press <b>Ctrl + V</b> to Paste Screenshot</p>
+                                </div>
+                                
+                                <input type="file" id="post-image-file" class="form-control form-control-sm" accept="image/*" onchange="handleFileSelect(event)">
+                                
+                                <div id="image-preview-container" class="mt-2 d-none text-center position-relative">
+                                    <img id="pasted-image-preview" src="" class="img-fluid rounded border border-secondary" style="max-height: 180px;">
+                                    <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1" onclick="clearSelectedImage()">✕</button>
+                                </div>
+                            </div>
+
+                            <button type="submit" id="post-btn" class="btn btn-accent w-100 py-2">
+                                <i class="bi bi-send"></i> UPLOAD & POST ANALYSIS
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PROFILE EDIT MODAL -->
+<div class="modal fade" id="profileModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content card-custom text-white border-info">
+            <div class="modal-header border-bottom border-secondary">
+                <h5 class="modal-title accent-text">👤 EDIT USER PROFILE</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <img id="profile-preview-img" src="" class="avatar-img mb-2" style="width: 80px; height: 80px;">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Display Name</label>
+                    <input type="text" id="edit-display-name" class="form-control" placeholder="Your Name">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Upload Profile Picture</label>
+                    <input type="file" id="edit-avatar-file" class="form-control form-control-sm" accept="image/*">
+                </div>
+                <button type="button" id="save-profile-btn" class="btn btn-accent w-100 py-2" onclick="saveUserProfile()">Save Profile</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- OFFCANVAS SIDEBAR FOR ANALYSIS HUB -->
+<div class="offcanvas offcanvas-end offcanvas-custom" tabindex="-1" id="analysisOffcanvas">
+    <div class="offcanvas-header border-bottom border-secondary">
+        <h5 class="offcanvas-title accent-text"><i class="bi bi-diagram-3"></i> TRADER ANALYSIS HUB</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body" id="analysis-feed-container">
+        <div class="search-box-wrap">
+            <i class="bi bi-search"></i>
+            <input type="text" id="analysis-search-input" class="form-control form-control-sm" placeholder="Search by symbol, notes or tag..." oninput="applyAnalysisFilters()">
+        </div>
+        <div class="tag-chip-row" id="analysis-tag-filter-row"></div>
+        <div id="analysis-posts-list">
+            <div class="text-center text-muted py-4">Loading analysis posts...</div>
+        </div>
+    </div>
+</div>
+
+<!-- OFFCANVAS SIDEBAR FOR PUBLIC CHAT -->
+<div class="offcanvas offcanvas-end offcanvas-custom" tabindex="-1" id="chatOffcanvas">
+    <div class="offcanvas-header border-bottom border-secondary">
+        <h5 class="offcanvas-title accent-text">💬 PUBLIC TRADER CHAT</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column justify-content-between p-3">
+        <div class="search-box-wrap">
+            <i class="bi bi-search"></i>
+            <input type="text" id="chat-search-input" class="form-control form-control-sm" placeholder="Search messages..." oninput="filterChatMessages(this.value)">
+        </div>
+        <div class="chat-box mb-3" id="chat-messages-container"></div>
+        <div id="chat-image-preview-container" class="d-none mb-2 position-relative" style="max-width:120px;">
+            <img id="chat-pasted-image-preview" src="" class="img-fluid rounded border border-secondary">
+            <button type="button" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-1 py-0 px-1" onclick="clearSelectedChatImage()">✕</button>
+        </div>
+        <form onsubmit="sendChatMessage(event)" class="d-flex gap-2">
+            <input type="file" id="chat-image-file" accept="image/*" class="d-none" onchange="handleChatFileSelect(event)">
+            <button type="button" class="btn btn-outline-secondary btn-sm px-2" onclick="document.getElementById('chat-image-file').click()"><i class="bi bi-image"></i></button>
+            <input type="text" id="chat-input-msg" class="form-control form-control-sm" placeholder="Type a message..." autocomplete="off">
+            <button type="submit" class="btn btn-accent btn-sm fw-bold px-3">Send</button>
+        </form>
+    </div>
+</div>
+
+<!-- OFFCANVAS SIDEBAR FOR SIGNALS HISTORY -->
+<div class="offcanvas offcanvas-end offcanvas-custom" tabindex="-1" id="historyOffcanvas">
+    <div class="offcanvas-header border-bottom border-secondary">
+        <h5 class="offcanvas-title accent-text">🔥 SIGNALS HISTORY</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="search-box-wrap">
+            <i class="bi bi-search"></i>
+            <input type="text" id="history-search-input" class="form-control form-control-sm" placeholder="Search by symbol or trader..." oninput="filterSignalsHistory(this.value)">
+        </div>
+        <div class="history-box" id="history-container"></div>
+    </div>
+</div>
+
+<!-- TELEGRAM MESSAGE PREVIEW MODAL -->
+<div class="modal fade" id="msgModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content card-custom text-white border-info">
+            <div class="modal-header border-bottom border-secondary">
+                <h5 class="modal-title accent-text">📩 Signal Output</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="telegram-msg-content" class="p-3 bg-dark text-white rounded font-monospace" style="white-space: pre-wrap;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+
 <script>
-/* =============================================================
-   REAL DELTA-BAR CHART — data source: Binance public API
-   - OHLC candles:  /api/v3/klines   (exact exchange O/H/L/C/V)
-   - Trade prints:  /api/v3/aggTrades (paginated per candle)
-     isBuyerMaker=true  -> taker SOLD  (aggressive sell)
-     isBuyerMaker=false -> taker BOUGHT (aggressive buy)
-   - Live updates via wss aggTrade stream for the forming candle
-============================================================= */
-const REST = 'https://fapi.binance.com/fapi/v1';
-const WS_BASE = 'wss://fstream.binance.com/ws';
-let symbol = 'BTCUSDT';
-let interval = '15m';
-const LOOKBACK = 20;
-const MAX_PAGES_PER_CANDLE = 5;
+    // CLOUDINARY CONFIG
+    const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/rhpqekvy/image/upload";
+    const CLOUDINARY_UPLOAD_PRESET = "DCAMYWEB";
 
-let candles = [];    // {time,open,high,low,close,vol}
-let stats = [];      // per-candle {delta,maxDelta,minDelta,volume}
-let ws = null;
-let dpr = window.devicePixelRatio || 1;
+    // FIREBASE CONFIG
+    const firebaseConfig = {
+        apiKey: "AIzaSyAwFtERvKyq5GCPMpvlpx5EBLryg_5trGI",
+        authDomain: "dcaweb-14e4d.firebaseapp.com",
+        databaseURL: "https://dcaweb-14e4d-default-rtdb.firebaseio.com",
+        projectId: "dcaweb-14e4d",
+        storageBucket: "dcaweb-14e4d.firebasestorage.app",
+        messagingSenderId: "173493394667",
+        appId: "1:173493394667:web:8539a294850d69a848b2ae"
+    };
 
-const canvas = document.getElementById('chart');
-const ctx = canvas.getContext('2d');
-const statusEl = document.getElementById('statusEl');
-const loadingEl = document.getElementById('loadingEl');
-const barFill = document.getElementById('barFill');
-const loadingSub = document.getElementById('loadingSub');
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.database();
 
-function intervalMs(iv){ return {'1m':60000,'5m':300000,'15m':900000,'1h':3600000}[iv]; }
+    const TOTAL_FEE = 0.001;
 
-function resize(){
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = rect.width*dpr; canvas.height = rect.height*dpr;
-  canvas.style.width = rect.width+'px'; canvas.style.height = rect.height+'px';
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  draw();
-}
-window.addEventListener('resize', resize);
+    let widget;
+    let previewModal;
+    let profileModal;
+    let isRegisterMode = false;
+    let selectedImageFile = null;
 
-async function fetchKlines(){
-  const res = await fetch(`${REST}/klines?symbol=${symbol}&interval=${interval}&limit=${LOOKBACK}`);
-  const raw = await res.json();
-  return raw.map(k=>({ time:k[0], open:+k[1], high:+k[2], low:+k[3], close:+k[4], vol:+k[5] }));
-}
+    // ============ PHASE 1: TIME FORMAT + NOTIFICATION STATE ============
+    let chatOffcanvasOpen = false;
+    let analysisOffcanvasOpen = false;
+    let notifDropdownOpen = false;
+    let chatUnreadCount = 0;
+    let analysisUnreadCount = 0;
+    let notifListenerStarted = false;
+    let notifInitialLoadDone = false;
 
-async function fetchAggTradesRange(startTime, endTime){
-  let out = []; let st = startTime;
-  for(let page=0; page<MAX_PAGES_PER_CANDLE; page++){
-    const res = await fetch(`${REST}/aggTrades?symbol=${symbol}&startTime=${st}&endTime=${endTime}&limit=1000`);
-    if(!res.ok) break;
-    const batch = await res.json();
-    if(!batch.length) break;
-    out = out.concat(batch);
-    if(batch.length<1000) break;
-    st = batch[batch.length-1].T+1;
-    if(st>endTime) break;
-  }
-  return out;
-}
-
-function classify(trades){
-  trades.sort((a,b)=>a.T-b.T);
-  let running=0, maxD=-Infinity, minD=Infinity, buy=0, sell=0, vol=0;
-  trades.forEach(t=>{
-    const qty=+t.q, isSell = t.m===true;
-    if(isSell){ sell+=qty; running-=qty; } else { buy+=qty; running+=qty; }
-    vol+=qty; maxD=Math.max(maxD,running); minD=Math.min(minD,running);
-  });
-  if(trades.length===0){ maxD=0; minD=0; }
-  return { delta:buy-sell, maxDelta:maxD===-Infinity?0:maxD, minDelta:minD===Infinity?0:minD, volume:vol, buy, sell };
-}
-
-async function loadAll(){
-  loadingEl.style.display='flex'; barFill.style.width='5%';
-  statusEl.className='status'; statusEl.innerHTML='<span class="sp"></span>loading candles…';
-  try{ candles = await fetchKlines(); }
-  catch(e){ loadingSub.textContent='Failed: '+e.message; return; }
-
-  stats = new Array(candles.length);
-  for(let i=0;i<candles.length;i++){
-    barFill.style.width = (10+(i/candles.length)*85)+'%';
-    loadingSub.textContent = `Candle ${i+1}/${candles.length} — pulling real trade prints…`;
-    const endT = i===candles.length-1 ? Date.now() : candles[i+1].time-1;
-    const trades = await fetchAggTradesRange(candles[i].time, endT);
-    stats[i] = classify(trades);
-  }
-  barFill.style.width='100%';
-  loadingEl.style.display='none';
-  renderStatsTable();
-  draw();
-  updateInfo();
-}
-
-function fmtVol(v){ if(v>=1000) return (v/1000).toFixed(1)+'k'; return v.toFixed(v<10?2:1); }
-
-function draw(){
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  ctx.clearRect(0,0,w,h);
-  if(!candles.length) return;
-
-  const padL=8, padR=64, padTop=54, padBot=10;
-  const maxP = Math.max(...candles.map(c=>c.high));
-  const minP = Math.min(...candles.map(c=>c.low));
-  const plotW = w-padL-padR, plotH = h-padTop-padBot;
-  const cw = plotW/candles.length;
-  const yFor = p => padTop + (1-(p-minP)/(maxP-minP))*plotH;
-
-  // grid
-  ctx.strokeStyle='rgba(255,255,255,0.035)'; ctx.lineWidth=1;
-  for(let i=0;i<=6;i++){ const y=padTop+(plotH*i/6); ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w-padR,y); ctx.stroke(); }
-
-  candles.forEach((c,i)=>{
-    const st = stats[i];
-    const x = padL + i*cw + cw/2;
-    const bw = Math.min(cw*0.62, 46);
-
-    // color by delta sign (with grey band near zero) — matches ATAS-style delta boxes
-    const dNorm = st.delta;
-    let col;
-    if(Math.abs(dNorm) < Math.max(3, st.volume*0.06)) col = '#8a97a8';
-    else if(dNorm>0) col = '#2bd97c';
-    else col = '#ff4d5e';
-
-    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.4;
-
-    // wick (high-low)
-    ctx.beginPath(); ctx.moveTo(x, yFor(c.high)); ctx.lineTo(x, yFor(c.low)); ctx.stroke();
-    // open tick (left)
-    ctx.beginPath(); ctx.moveTo(x-bw/2, yFor(c.open)); ctx.lineTo(x, yFor(c.open)); ctx.stroke();
-    // close tick (right)
-    ctx.beginPath(); ctx.moveTo(x, yFor(c.close)); ctx.lineTo(x+bw/2, yFor(c.close)); ctx.stroke();
-    // faint body box (like the reference image's boxed candle)
-    ctx.globalAlpha = 0.08;
-    ctx.fillRect(x-bw/2, yFor(Math.max(c.open,c.close)), bw, Math.max(Math.abs(yFor(c.open)-yFor(c.close)),2));
-    ctx.globalAlpha = 1;
-    ctx.strokeRect(x-bw/2, yFor(c.high), bw, yFor(c.low)-yFor(c.high));
-
-    // labels above
-    ctx.textAlign = 'center';
-    ctx.font = 'bold 12px IBM Plex Mono, monospace';
-    ctx.fillStyle = 'var(--blue)'.includes('var')? '#4fc3ff' : '#4fc3ff';
-    ctx.fillText(fmtVol(st.volume), x, padTop-24);
-    ctx.font = 'bold 11px IBM Plex Mono, monospace';
-    ctx.fillStyle = st.delta>=0 ? '#2bd97c' : '#ff4d5e';
-    ctx.fillText((st.delta>=0?'+':'')+st.delta.toFixed(0), x, padTop-9);
-  });
-
-  // right price axis
-  ctx.fillStyle='#526073'; ctx.font='10px IBM Plex Mono, monospace'; ctx.textAlign='left';
-  for(let i=0;i<=8;i++){
-    const p = minP + (maxP-minP)*(i/8);
-    ctx.fillText(p.toFixed(p<10?4:1), w-padR+8, yFor(p)+3);
-  }
-
-  // last price line
-  const last = candles[candles.length-1];
-  const ly = yFor(last.close);
-  const lastCol = stats[stats.length-1].delta>=0 ? '#2bd97c' : '#ff4d5e';
-  ctx.strokeStyle = lastCol; ctx.setLineDash([4,3]);
-  ctx.beginPath(); ctx.moveTo(0,ly); ctx.lineTo(w-padR,ly); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = lastCol; ctx.fillRect(w-padR, ly-8, padR, 16);
-  ctx.fillStyle='#04140b'; ctx.font='bold 10px IBM Plex Mono, monospace';
-  ctx.fillText(last.close.toFixed(last.close<10?4:1), w-padR+4, ly+3);
-
-  // bottom-right symbol/time label
-  ctx.fillStyle='#526073'; ctx.font='11px IBM Plex Mono, monospace'; ctx.textAlign='right';
-  const d = new Date(last.time);
-  const hh = String(d.getUTCHours()).padStart(2,'0'), mm=String(d.getUTCMinutes()).padStart(2,'0');
-  ctx.fillText(`${symbol}, ${interval}  ${hh}:${mm}`, w-padR-8, h-14);
-}
-
-function renderStatsTable(){
-  const statsTable = document.getElementById('statsTable');
-  statsTable.innerHTML='';
-  candles.forEach((c,i)=>{
-    const st = stats[i];
-    const prevDelta = i>0 ? stats[i-1].delta : 0;
-    const dChange = st.delta - prevDelta;
-    const col = document.createElement('div'); col.className='stats-col';
-    const rows = [
-      {v:st.delta, colorize:true},
-      {v:st.maxDelta, colorize:false},
-      {v:st.minDelta, colorize:false},
-      {v:dChange, colorize:true},
-      {v:st.volume, colorize:false, plain:true}
-    ];
-    rows.forEach(cfg=>{
-      const cell = document.createElement('div'); cell.className='stat-cell';
-      cell.textContent = cfg.plain ? fmtVol(cfg.v) : (cfg.v>=0?'+':'')+cfg.v.toFixed(1);
-      if(cfg.colorize){
-        cell.style.background = cfg.v>=0 ? 'rgba(43,217,124,0.18)' : 'rgba(255,77,94,0.18)';
-        cell.style.color = cfg.v>=0 ? '#2bd97c' : '#ff4d5e';
-      } else if(!cfg.plain){
-        cell.style.color = '#8a97a8';
-      }
-      col.appendChild(cell);
-    });
-    statsTable.appendChild(col);
-  });
-  const statsScroll = document.getElementById('statsScroll');
-  statsScroll.scrollLeft = statsScroll.scrollWidth;
-}
-
-function updateInfo(){
-  const last = candles[candles.length-1];
-  document.getElementById('infoSym').textContent = symbol;
-  document.getElementById('infoO').textContent = last.open.toFixed(2);
-  document.getElementById('infoH').textContent = last.high.toFixed(2);
-  document.getElementById('infoL').textContent = last.low.toFixed(2);
-  document.getElementById('infoC').textContent = last.close.toFixed(2);
-  document.getElementById('infoV').textContent = fmtVol(last.vol);
-}
-
-/* ---- live: stream real trades into the forming candle ---- */
-function connectWS(){
-  if(ws){ try{ ws.close(); }catch(e){} }
-  statusEl.className='status'; statusEl.innerHTML='<span class="sp"></span>connecting…';
-  ws = new WebSocket(`${WS_BASE}/${symbol.toLowerCase()}@aggTrade`);
-  ws.onopen = ()=>{ statusEl.className='status live'; statusEl.innerHTML='<span class="sp"></span>live trade stream'; };
-  ws.onclose = ()=>{ statusEl.className='status'; statusEl.innerHTML='<span class="sp"></span>reconnecting…'; setTimeout(connectWS,2000); };
-  ws.onerror = ()=> ws.close();
-  ws.onmessage = (msg)=>{
-    const t = JSON.parse(msg.data);
-    const lastCandle = candles[candles.length-1];
-    const boundary = lastCandle.time + intervalMs(interval);
-    if(t.T >= boundary){ loadAll().then(connectWS); return; }
-    const price=+t.p, qty=+t.q, isSell = t.m===true;
-    const st = stats[stats.length-1];
-    if(isSell) st.sell+=qty; else st.buy+=qty;
-    st.delta = st.buy-st.sell; st.volume+=qty;
-    st.maxDelta = Math.max(st.maxDelta, st.delta);
-    st.minDelta = Math.min(st.minDelta, st.delta);
-    lastCandle.close = price;
-    lastCandle.high = Math.max(lastCandle.high, price);
-    lastCandle.low = Math.min(lastCandle.low, price);
-    lastCandle.vol += qty;
-    draw(); updateInfo();
-    // live-update just the last stats column value without full rebuild
-    const cells = document.querySelectorAll('.stats-col:last-child .stat-cell');
-    if(cells.length){
-      cells[0].textContent = (st.delta>=0?'+':'')+st.delta.toFixed(1);
-      cells[0].style.background = st.delta>=0?'rgba(43,217,124,0.18)':'rgba(255,77,94,0.18)';
-      cells[0].style.color = st.delta>=0?'#2bd97c':'#ff4d5e';
-      cells[1].textContent = (st.maxDelta>=0?'+':'')+st.maxDelta.toFixed(1);
-      cells[2].textContent = (st.minDelta>=0?'+':'')+st.minDelta.toFixed(1);
-      cells[4].textContent = fmtVol(st.volume);
+    function formatChatTime(ts) {
+        if (!ts) return "";
+        const d = new Date(ts);
+        const now = new Date();
+        const isToday = d.toDateString() === now.toDateString();
+        const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if (isToday) return timeStr;
+        const dateStr = d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+        return `${dateStr} ${timeStr}`;
     }
-  };
+
+    function timeAgo(ts) {
+        if (!ts) return "";
+        const seconds = Math.floor((Date.now() - ts) / 1000);
+        if (seconds < 60) return "just now";
+        const mins = Math.floor(seconds / 60);
+        if (mins < 60) return `${mins}m ago`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs}h ago`;
+        const days = Math.floor(hrs / 24);
+        return `${days}d ago`;
+    }
+
+    function requestBrowserNotifPermission() {
+        if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission();
+        }
+    }
+
+    function showBrowserNotification(title, body, icon) {
+        if ("Notification" in window && Notification.permission === "granted") {
+            try {
+                new Notification(title, { body, icon: icon || undefined });
+            } catch (e) { /* ignore */ }
+        }
+    }
+
+    function updateBadge(el, count) {
+        if (!el) return;
+        if (count > 0) {
+            el.innerText = count > 99 ? "99+" : count;
+            el.classList.remove("d-none");
+        } else {
+            el.classList.add("d-none");
+        }
+    }
+
+    // TOAST NOTIFICATIONS (replaces alert())
+    function toast(message, type = "info") {
+        const stack = document.getElementById("toast-stack");
+        if (!stack) { window.alert(message); return; }
+        const icons = { success: "bi-check-circle-fill", error: "bi-x-circle-fill", info: "bi-info-circle-fill" };
+        const el = document.createElement("div");
+        el.className = `apex-toast ${type}`;
+        el.innerHTML = `<i class="bi ${icons[type] || icons.info}"></i><div>${message}</div>`;
+        stack.appendChild(el);
+        setTimeout(() => {
+            el.classList.add("closing");
+            setTimeout(() => el.remove(), 220);
+        }, 4200);
+    }
+
+    function togglePasswordVisibility() {
+        const input = document.getElementById("auth-password");
+        const icon = document.getElementById("pw-toggle-icon");
+        const showing = input.type === "text";
+        input.type = showing ? "password" : "text";
+        icon.className = showing ? "bi bi-eye" : "bi bi-eye-slash";
+    }
+
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            document.getElementById("auth-container").style.display = "none";
+            document.getElementById("main-app-container").style.display = "block";
+            
+            const name = user.displayName || user.email.split('@')[0];
+            const photo = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00d4ff&color=0a0a1a`;
+
+            document.getElementById("user-email-display").innerText = name;
+            document.getElementById("user-avatar-display").src = photo;
+            
+            if (!widget) loadChart("BTCUSDT");
+            listenToFirebaseSignals();
+            listenToPublicChat();
+            listenToAnalysisPosts();
+            requestBrowserNotifPermission();
+            listenToUserNotifications(user.uid);
+            setupPresence(user.uid);
+            listenToPriceAlerts(user.uid);
+            startAlertPolling();
+        } else {
+            document.getElementById("auth-container").style.display = "block";
+            document.getElementById("main-app-container").style.display = "none";
+        }
+    });
+
+    function toggleAuthMode() {
+        isRegisterMode = !isRegisterMode;
+        document.getElementById("username-field-group").classList.toggle("d-none", !isRegisterMode);
+        document.getElementById("auth-title").innerText = isRegisterMode ? "📝 REGISTER" : "🔐 LOGIN";
+    }
+
+    async function handleAuth(e) {
+        e.preventDefault();
+        const email = document.getElementById("auth-email").value.trim();
+        const password = document.getElementById("auth-password").value;
+        const username = document.getElementById("auth-username").value.trim();
+
+        try {
+            if (isRegisterMode) {
+                const userCred = await auth.createUserWithEmailAndPassword(email, password);
+                const defaultPhoto = `https://ui-avatars.com/api/?name=${encodeURIComponent(username || email)}&background=00d4ff&color=0a0a1a`;
+                await userCred.user.updateProfile({ 
+                    displayName: username,
+                    photoURL: defaultPhoto
+                });
+            } else {
+                await auth.signInWithEmailAndPassword(email, password);
+            }
+        } catch (err) {
+            toast(err.message, "error");
+        }
+    }
+
+    function logoutUser() { auth.signOut(); }
+
+    function openProfileModal() {
+        const user = auth.currentUser;
+        if (!user) return;
+        const name = user.displayName || user.email.split('@')[0];
+        const photo = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}`;
+
+        document.getElementById("edit-display-name").value = name;
+        document.getElementById("profile-preview-img").src = photo;
+        profileModal.show();
+    }
+
+    async function saveUserProfile() {
+        const user = auth.currentUser;
+        if (!user) return;
+
+        const newName = document.getElementById("edit-display-name").value.trim();
+        const fileInput = document.getElementById("edit-avatar-file");
+        const btn = document.getElementById("save-profile-btn");
+
+        btn.disabled = true;
+        btn.innerText = "Saving...";
+
+        try {
+            let photoUrl = user.photoURL;
+
+            if (fileInput.files[0]) {
+                const formData = new FormData();
+                formData.append("file", fileInput.files[0]);
+                formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+                const res = await fetch(CLOUDINARY_URL, { method: "POST", body: formData });
+                const data = await res.json();
+                if (data.secure_url) photoUrl = data.secure_url;
+            }
+
+            await user.updateProfile({
+                displayName: newName || user.displayName,
+                photoURL: photoUrl
+            });
+
+            document.getElementById("user-email-display").innerText = user.displayName;
+            document.getElementById("user-avatar-display").src = user.photoURL;
+
+            btn.disabled = false;
+            btn.innerText = "Save Profile";
+            profileModal.hide();
+            toast("Profile updated successfully!", "success");
+        } catch (err) {
+            toast("Update failed: " + err.message, "error");
+            btn.disabled = false;
+            btn.innerText = "Save Profile";
+        }
+    }
+
+    function switchTab(panelId, btnId) {
+        document.querySelectorAll('.tab-pane-custom').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+        document.getElementById(panelId).classList.add('active');
+        document.getElementById(btnId).classList.add('active');
+    }
+
+    function loadChart(symbol) {
+      widget = new TradingView.widget({
+            "autosize": true,
+            "symbol": "BINANCE:" + symbol,
+            "interval": "15",
+            "timezone": "Etc/UTC",
+            "theme": "dark",
+            "style": "1",
+            "locale": "en",
+            "toolbar_bg": "#f1f3f6",
+            "enable_publishing": false,
+            "allow_symbol_change": true,
+            "hide_side_toolbar": false,          // Left Side Toolbar (Drawing tools)
+            "withdateranges": true,               // Date Range bar
+            "hide_top_toolbar": false,            // Top Toolbar
+            "container_id": "chart-container",    // Chart Container ID
+            "enabled_features": [
+                "header_fullscreen_button",        // Native TradingView Fullscreen Button
+                "left_toolbar",                    // Left Side Drawing Toolbar Force Enable
+                "control_bar"                      // Bottom Navigation Bar
+            ],
+            "disabled_features": [
+            ]
+        });
+    }
+
+    function updateChartSymbol(symbol) {
+        if (widget && symbol.length >= 5) widget.chart().setSymbol("BINANCE:" + symbol);
+    }
+
+    // ---- Chart Source Toggle: TradingView <-> CoinGlass Legend ----
+    function switchChartSource(src) {
+        const tvBtn = document.getElementById('btn-src-tv');
+        const cgBtn = document.getElementById('btn-src-cg');
+        const tvBox = document.getElementById('chart-container');
+        const cgBox = document.getElementById('coinglass-container');
+        const cgUrlWrap = document.getElementById('cg-url-wrap');
+        const cgNote = document.getElementById('cg-fallback-note');
+
+        if (src === 'cg') {
+            tvBtn.classList.remove('active');
+            cgBtn.classList.add('active');
+            tvBox.classList.add('hidden-src');
+            cgBox.classList.add('active');
+            cgUrlWrap.classList.add('show');
+            cgNote.style.display = 'block';
+            if (!cgBox.dataset.loaded) loadCoinglassChart();
+        } else {
+            cgBtn.classList.remove('active');
+            tvBtn.classList.add('active');
+            tvBox.classList.remove('hidden-src');
+            cgBox.classList.remove('active');
+            cgUrlWrap.classList.remove('show');
+            cgNote.style.display = 'none';
+        }
+    }
+
+    function loadCoinglassChart() {
+        const url = document.getElementById('cg-url-input').value.trim();
+        const cgBox = document.getElementById('coinglass-container');
+        const openLink = document.getElementById('cg-open-newtab');
+        if (!url) return;
+        cgBox.innerHTML = '<iframe src="' + url + '" allow="fullscreen" loading="lazy"></iframe>';
+        cgBox.dataset.loaded = "1";
+        openLink.href = url;
+    }
+
+    // CALCULATOR LOGIC
+    function calculatePositionSize(entry, sl, riskUsdt) {
+        let slPct = Math.abs(entry - sl) / entry;
+        return riskUsdt / (slPct + TOTAL_FEE);
+    }
+
+    function calculateDcaRecoverySize(signalType, s1, p1, p3, p2, desiredProfit) {
+    // 1st trade එකේ සත්‍ය ලාභ/පාඩුව ගණන් හදන්නේ P2 (Target Exit) එකට සාපේක්ෂවයි — P3 ට නෙවෙයි
+    let firstTradeLossPct = signalType === "BUY" ? (p1 - p2) / p1 : (p2 - p1) / p1;
+    let firstTradeLoss = s1 * firstTradeLossPct;
+    let firstTradeFee = s1 * TOTAL_FEE;
+
+    // ලබාගත යුතු මුළු ශුද්ධ ආදායම
+    let totalTargetUsdt = desiredProfit + firstTradeLoss + firstTradeFee;
+
+    // 2nd trade එකෙන් ලැබෙන ලාභ ප්‍රතිශතය (P3 → P2)
+    let secondTradeGainPct = signalType === "BUY" ? (p2 - p3) / p3 : (p3 - p2) / p3;
+
+    // 2nd trade fee එකත් 1st එකේ convention එකටම සමානව (round-trip = 1x TOTAL_FEE)
+    let netSecondTradeGainPct = secondTradeGainPct - TOTAL_FEE;
+
+    if (netSecondTradeGainPct <= 0) {
+        throw new Error("Target Exit (P2) Price is too close to Entry (P3) to cover Trading Fees!");
+    }
+
+    return totalTargetUsdt / netSecondTradeGainPct;
 }
 
-document.querySelectorAll('.tf-btn').forEach(b=>{
-  b.onclick = ()=>{
-    document.querySelectorAll('.tf-btn').forEach(x=>x.classList.remove('active'));
-    b.classList.add('active'); interval = b.dataset.tf;
-    loadAll().then(connectWS);
-  };
-});
-document.getElementById('symSelect').onchange = (e)=>{ symbol=e.target.value; loadAll().then(connectWS); };
-document.getElementById('refreshBtn').onclick = ()=> loadAll().then(connectWS);
+    async function processLiveSignal() {
+        const symbol = document.getElementById("symbol").value.trim().toUpperCase();
+        const signal = document.getElementById("signal").value;
+        const sl = parseFloat(document.getElementById("sl").value);
+        let tp = parseFloat(document.getElementById("tp").value);
+        const rr = parseFloat(document.getElementById("rr").value);
+        const risk = parseFloat(document.getElementById("risk").value);
+        const leverage = parseFloat(document.getElementById("leverage").value);
+        const dca_p2 = parseFloat(document.getElementById("dca_p2").value);
+        const dca_profit = parseFloat(document.getElementById("dca_profit").value);
+        const user = auth.currentUser;
 
-resize();
-loadAll().then(connectWS);
+        if (!user) {
+            toast("Please login first!", "error");
+            return;
+        }
+
+        const authorName = user.displayName || user.email.split('@')[0];
+        const avatar = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}`;
+
+        try {
+            let pRes = await fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${symbol}`);
+            let pData = await pRes.json();
+            let entryPrice = parseFloat(pData.markPrice);
+
+            if (isNaN(tp)) {
+                let slDist = Math.abs(entryPrice - sl);
+                tp = signal === "BUY" ? entryPrice + (slDist * rr) : entryPrice - (slDist * rr);
+            }
+
+            let usdtAmountSize = calculatePositionSize(entryPrice, sl, risk);
+            let s2 = calculateDcaRecoverySize(signal, usdtAmountSize, entryPrice, sl, dca_p2, dca_profit);
+
+            let emoji = signal === "BUY" ? "🟢" : "🔴";
+            let tgMsg = `${emoji} <b>${symbol} — ${signal}</b>\n\n` +
+                `📈 Entry : <code>${entryPrice.toFixed(4)}</code>\n` +
+                `🛑 SL : <code>${sl.toFixed(4)}</code>\n` +
+                `🎯 TP : <code>${tp.toFixed(4)}</code>\n` +
+                `⚡ Leverage : <code>${leverage}x</code>\n\n` +
+                `📦 <b>Size (per ${risk} USDT risk)</b>\n` +
+                `   USDT Amount Size : <code>$${usdtAmountSize.toFixed(2)}</code>\n\n` +
+                `🧮 <b>DCA RECOVERY</b>\n` +
+                `   📍 DCA Entry (P3=SL) : <code>${sl.toFixed(4)}</code>\n` +
+                `   🎯 DCA Target (P2) : <code>${dca_p2.toFixed(4)}</code>\n` +
+                `   💵 Desired Profit : <code>$${dca_profit.toFixed(2)}</code>\n` +
+                `   🔥 Recovery Size (S2) : <code>$${s2.toFixed(2)} USDT</code>\n` +
+                `   📊 Total Position : <code>$${(usdtAmountSize + s2).toFixed(2)} USDT</code>`;
+
+            await db.ref('signals').push({ 
+                uid: user.uid,
+                author: authorName,
+                avatar: avatar,
+                symbol, 
+                signal, 
+                entry: entryPrice, 
+                sl, 
+                tp, 
+                messageText: tgMsg, 
+                timestamp: firebase.database.ServerValue.TIMESTAMP 
+            });
+
+            document.getElementById("telegram-msg-content").innerHTML = tgMsg;
+            previewModal.show();
+        } catch (err) { toast(`Failed: ${err.message}`, "error"); }
+    }
+
+    async function processDcaOnlySignal() {
+        const symbol = document.getElementById("do_symbol").value.trim().toUpperCase();
+        const signal = document.getElementById("do_signal").value;
+        const p1 = parseFloat(document.getElementById("do_p1").value);
+        const s1 = parseFloat(document.getElementById("do_s1").value);
+        const p3 = parseFloat(document.getElementById("do_p3").value);
+        const p2 = parseFloat(document.getElementById("do_p2").value);
+        const profit = parseFloat(document.getElementById("do_profit").value);
+        const user = auth.currentUser;
+
+        if (!user) {
+            toast("Please login first!", "error");
+            return;
+        }
+
+        const authorName = user.displayName || user.email.split('@')[0];
+        const avatar = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}`;
+
+        try {
+            let s2 = calculateDcaRecoverySize(signal, s1, p1, p3, p2, profit);
+            let emoji = signal === "BUY" ? "🟢" : "🔴";
+            let tgMsg = `${emoji} <b>${symbol} — DCA RECOVERY ALERT</b> (${signal})\n\n` +
+                `📌 Entry (P1): <code>${p1.toFixed(4)}</code>\n` +
+                `💰 1st Margin (S1): <code>$${s1.toFixed(2)} USDT</code>\n` +
+                `📍 DCA Entry (P3): <code>${p3.toFixed(4)}</code>\n` +
+                `🔥 DCA Size (S2): <code>$${s2.toFixed(2)} USDT</code>\n` +
+                `🎯 DCA Target Exit (P2): <code>${p2.toFixed(4)}</code>\n` +
+                `💵 Desired Profit: <code>$${profit.toFixed(2)} USDT</code>`;
+
+            await db.ref('signals').push({ 
+                uid: user.uid,
+                author: authorName,
+                avatar: avatar,
+                symbol, 
+                signal, 
+                p1, 
+                p3, 
+                messageText: tgMsg, 
+                timestamp: firebase.database.ServerValue.TIMESTAMP 
+            });
+
+            document.getElementById("telegram-msg-content").innerHTML = tgMsg;
+            previewModal.show();
+        } catch (err) { toast(`Failed: ${err.message}`, "error"); }
+    }
+
+    // LISTEN TO SIGNALS HISTORY (UPDATED FOR SORTING & AUTO-RE-RENDER ON DELETE)
+    let allSignalsHistory = [];
+    let historySearchQuery = "";
+
+    function renderSignalCard(item) {
+        const authorName = item.author || "Trader";
+        const avatarUrl = item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}`;
+        const signalTime = item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        return `
+            <div class="history-card ${item.signal === 'SELL' ? 'sell' : ''}">
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-1 border-bottom border-secondary">
+                    <div class="d-flex align-items-center gap-2">
+                        <img src="${avatarUrl}" class="avatar-sm">
+                        <span class="accent-text fw-bold" style="font-size: 13px;">${authorName}</span>
+                    </div>
+                    <span class="text-muted small">${signalTime}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <strong class="text-white fs-6">${item.symbol}</strong>
+                    <span class="badge ${item.signal === 'BUY' ? 'bg-success' : 'bg-danger'}">${item.signal}</span>
+                </div>
+                <div class="small text-light mt-2" style="white-space:pre-wrap;">${item.messageText || ''}</div>
+            </div>`;
+    }
+
+    function renderSignalsHistory() {
+        const container = document.getElementById("history-container");
+        const q = historySearchQuery.trim().toLowerCase();
+        const filtered = q ? allSignalsHistory.filter(item =>
+            (item.symbol || "").toLowerCase().includes(q) || (item.author || "").toLowerCase().includes(q)
+        ) : allSignalsHistory;
+
+        if (!filtered.length) {
+            container.innerHTML = '<div class="text-muted text-center py-3">No signals shared yet.</div>';
+            return;
+        }
+
+        container.innerHTML = filtered.map(renderSignalCard).join("");
+    }
+
+    function filterSignalsHistory(query) {
+        historySearchQuery = query;
+        renderSignalsHistory();
+    }
+
+    function listenToFirebaseSignals() {
+        db.ref('signals').limitToLast(50).on('value', (snapshot) => {
+            const items = [];
+            snapshot.forEach((child) => {
+                items.push({ id: child.key, ...child.val() });
+            });
+            allSignalsHistory = items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            renderSignalsHistory();
+        });
+    }
+
+    // PUBLIC CHAT
+    let selectedChatImageFile = null;
+
+    async function sendChatMessage(e) {
+        e.preventDefault();
+        const input = document.getElementById("chat-input-msg");
+        const msgText = input.value.trim();
+        const user = auth.currentUser;
+        if ((!msgText && !selectedChatImageFile) || !user) return;
+
+        const senderName = user.displayName || user.email.split('@')[0];
+        const avatar = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(senderName)}`;
+
+        const payload = {
+            uid: user.uid,
+            sender: senderName,
+            avatar: avatar,
+            message: msgText,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        };
+
+        if (selectedChatImageFile) {
+            try {
+                const formData = new FormData();
+                formData.append("file", selectedChatImageFile);
+                formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+                const res = await fetch(CLOUDINARY_URL, { method: "POST", body: formData });
+                const data = await res.json();
+                if (data.secure_url) payload.imageUrl = data.secure_url;
+            } catch (err) {
+                toast("Image upload failed: " + err.message, "error");
+            }
+            clearSelectedChatImage();
+        }
+
+        await db.ref('public_chat').push(payload);
+        input.value = "";
+    }
+
+    function handleChatFileSelect(e) {
+        if (e.target.files[0]) {
+            selectedChatImageFile = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                document.getElementById('chat-pasted-image-preview').src = ev.target.result;
+                document.getElementById('chat-image-preview-container').classList.remove('d-none');
+            };
+            reader.readAsDataURL(selectedChatImageFile);
+        }
+    }
+
+    function clearSelectedChatImage() {
+        selectedChatImageFile = null;
+        document.getElementById('chat-image-file').value = "";
+        document.getElementById('chat-pasted-image-preview').src = "";
+        document.getElementById('chat-image-preview-container').classList.add('d-none');
+    }
+
+    const REACTION_EMOJIS = ["👍", "🔥", "🚀"];
+    let lastChatMsgKey = null;
+    let chatFirstLoad = true;
+    let allChatMessages = [];
+    let chatSearchQuery = "";
+
+    function renderChatMessage(item) {
+        const currentUser = auth.currentUser;
+        const isMe = currentUser && item.uid === currentUser.uid;
+        const avatarUrl = item.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(item.sender)}`;
+        const imgHtml = item.imageUrl ? `<a href="${item.imageUrl}" target="_blank"><img src="${item.imageUrl}" class="chat-msg-img"></a>` : "";
+        const msgHtml = item.message ? `<div>${item.message}</div>` : "";
+
+        let reactionsHtml = `<div class="reaction-bar">`;
+        REACTION_EMOJIS.forEach(emoji => {
+            const reactors = (item.reactions && item.reactions[emoji]) || {};
+            const count = Object.keys(reactors).length;
+            const reacted = currentUser && reactors[currentUser.uid];
+            if (count > 0 || true) {
+                reactionsHtml += `<span class="reaction-chip ${reacted ? 'reacted' : ''}" onclick="toggleReaction('${item.id}','${emoji}')">${emoji}${count > 0 ? ' ' + count : ''}</span>`;
+            }
+        });
+        reactionsHtml += `</div>`;
+
+        return `
+            <div class="chat-msg ${isMe ? 'my-msg' : ''}" data-msg-id="${item.id}">
+                <div class="chat-msg-top-row mb-1">
+                    <div class="d-flex align-items-center gap-2">
+                        <img src="${avatarUrl}" class="avatar-sm">
+                        <span class="accent-text fw-bold small">${item.sender}</span>
+                    </div>
+                    <span class="chat-msg-time">${formatChatTime(item.timestamp)}</span>
+                </div>
+                ${msgHtml}
+                ${imgHtml}
+                ${reactionsHtml}
+            </div>`;
+    }
+
+    function renderChatList() {
+        const chatContainer = document.getElementById("chat-messages-container");
+        const q = chatSearchQuery.trim().toLowerCase();
+        const filtered = q ? allChatMessages.filter(m =>
+            (m.message || "").toLowerCase().includes(q) || (m.sender || "").toLowerCase().includes(q)
+        ) : allChatMessages;
+        chatContainer.innerHTML = filtered.map(renderChatMessage).join("") ||
+            `<div class="text-center text-faint py-4 small">No messages found.</div>`;
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function filterChatMessages(query) {
+        chatSearchQuery = query;
+        renderChatList();
+    }
+
+    function toggleReaction(msgId, emoji) {
+        const user = auth.currentUser;
+        if (!user) return;
+        const reactionRef = db.ref(`public_chat/${msgId}/reactions/${emoji}/${user.uid}`);
+        reactionRef.once('value', (snap) => {
+            if (snap.exists()) reactionRef.remove();
+            else reactionRef.set(true);
+        });
+    }
+
+    function listenToPublicChat() {
+        const currentUser = auth.currentUser;
+
+        db.ref('public_chat').limitToLast(50).on('value', (snapshot) => {
+            const items = [];
+            let newestKey = null;
+            let newestItem = null;
+            snapshot.forEach((child) => {
+                const item = { id: child.key, ...child.val() };
+                items.push(item);
+                newestKey = child.key;
+                newestItem = item;
+            });
+            allChatMessages = items;
+            renderChatList();
+
+            if (!chatFirstLoad && newestKey && newestKey !== lastChatMsgKey) {
+                const isFromOther = !currentUser || newestItem.uid !== currentUser.uid;
+                if (isFromOther && !chatOffcanvasOpen) {
+                    chatUnreadCount++;
+                    updateBadge(document.getElementById("chat-unread-badge"), chatUnreadCount);
+                }
+            }
+            lastChatMsgKey = newestKey;
+            chatFirstLoad = false;
+        });
+    }
+
+    // CLIPBOARD PASTE & IMAGE PREVIEW LOGIC
+    document.addEventListener('paste', function(e) {
+        const sharePanel = document.getElementById('share-panel');
+        if (!sharePanel.classList.contains('active')) return;
+
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (let index = 0; index < items.length; index++) {
+            const item = items[index];
+            if (item.kind === 'file' && item.type.includes('image')) {
+                const blob = item.getAsFile();
+                selectedImageFile = blob;
+                previewImage(blob);
+                break;
+            }
+        }
+    });
+
+    function handleFileSelect(e) {
+        if (e.target.files[0]) {
+            selectedImageFile = e.target.files[0];
+            previewImage(selectedImageFile);
+        }
+    }
+
+    function previewImage(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('pasted-image-preview').src = e.target.result;
+            document.getElementById('image-preview-container').classList.remove('d-none');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function clearSelectedImage() {
+        selectedImageFile = null;
+        document.getElementById('post-image-file').value = "";
+        document.getElementById('pasted-image-preview').src = "";
+        document.getElementById('image-preview-container').classList.add('d-none');
+    }
+
+    // CLOUDINARY UPLOAD & POST ANALYSIS
+    async function uploadAndPostAnalysis(e) {
+        e.preventDefault();
+        const btn = document.getElementById("post-btn");
+        const symbol = document.getElementById("post-symbol").value.trim().toUpperCase();
+        const bias = document.getElementById("post-bias").value;
+        const notes = document.getElementById("post-notes").value.trim();
+        const tagsRaw = document.getElementById("post-tags").value.trim();
+        const tags = tagsRaw ? tagsRaw.split(",").map(t => t.trim()).filter(Boolean) : [];
+        const user = auth.currentUser;
+
+        if (!selectedImageFile || !user) {
+            toast("Please paste (Ctrl+V) or select a chart screenshot image!", "error");
+            return;
+        }
+
+        btn.disabled = true;
+
+        try {
+            const formData = new FormData();
+            formData.append("file", selectedImageFile);
+            formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+            const res = await fetch(CLOUDINARY_URL, { method: "POST", body: formData });
+            const data = await res.json();
+
+            if (!data.secure_url) throw new Error("Cloudinary upload failed!");
+
+            const authorName = user.displayName || user.email.split('@')[0];
+            const avatar = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}`;
+
+            await db.ref("analysis_posts").push({
+                uid: user.uid, 
+                author: authorName,
+                avatar: avatar,
+                symbol, bias, notes, tags, imageUrl: data.secure_url, likes: 0,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+
+            document.getElementById("post-notes").value = "";
+            document.getElementById("post-tags").value = "";
+            clearSelectedImage();
+            btn.disabled = false;
+            toast("Analysis posted successfully!", "success");
+        } catch (err) {
+            toast("Error: " + err.message, "error");
+            btn.disabled = false;
+        }
+    }
+
+    let allAnalysisPosts = [];
+    let activeTagFilter = null;
+    let analysisSearchQuery = "";
+
+    function renderAnalysisTagRow() {
+        const row = document.getElementById("analysis-tag-filter-row");
+        if (!row) return;
+        const tagSet = new Set();
+        allAnalysisPosts.forEach(p => (p.tags || []).forEach(t => tagSet.add(t)));
+        if (tagSet.size === 0) { row.innerHTML = ""; return; }
+        let html = `<span class="tag-chip ${!activeTagFilter ? 'active' : ''}" onclick="setTagFilter(null)">All</span>`;
+        [...tagSet].forEach(t => {
+            html += `<span class="tag-chip ${activeTagFilter === t ? 'active' : ''}" onclick="setTagFilter('${t}')">#${t}</span>`;
+        });
+        row.innerHTML = html;
+    }
+
+    function setTagFilter(tag) {
+        activeTagFilter = tag;
+        renderAnalysisTagRow();
+        applyAnalysisFilters();
+    }
+
+    function applyAnalysisFilters() {
+        analysisSearchQuery = (document.getElementById("analysis-search-input")?.value || "").trim().toLowerCase();
+        renderAnalysisPostsList();
+    }
+
+    function renderAnalysisPostsList() {
+        const listEl = document.getElementById("analysis-posts-list");
+        if (!listEl) return;
+        let posts = allAnalysisPosts;
+
+        if (activeTagFilter) {
+            posts = posts.filter(p => (p.tags || []).includes(activeTagFilter));
+        }
+        if (analysisSearchQuery) {
+            posts = posts.filter(p =>
+                (p.symbol || "").toLowerCase().includes(analysisSearchQuery) ||
+                (p.notes || "").toLowerCase().includes(analysisSearchQuery) ||
+                (p.tags || []).some(t => t.toLowerCase().includes(analysisSearchQuery))
+            );
+        }
+
+        if (!posts.length) {
+            listEl.innerHTML = `<div class="text-center text-faint py-4 small">No matching analysis posts.</div>`;
+            return;
+        }
+
+        let html = "";
+        posts.forEach((post) => {
+            const avatarUrl = post.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author)}`;
+            const tagsHtml = (post.tags || []).map(t => `<span class="analysis-tag-pill">#${t}</span>`).join("");
+            html += `
+                <div class="analysis-card" id="post-card-${post.id}">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <img src="${avatarUrl}" class="avatar-sm">
+                            <strong class="accent-text">${post.author}</strong>
+                        </div>
+                        <span class="badge ${post.bias === 'BULLISH' ? 'bg-success' : 'bg-danger'}">${post.symbol}</span>
+                    </div>
+                    <a href="${post.imageUrl}" target="_blank"><img src="${post.imageUrl}" class="analysis-img mb-2"></a>
+                    <p class="small text-light mb-1">${post.notes}</p>
+                    ${tagsHtml ? `<div class="mb-2">${tagsHtml}</div>` : ""}
+                    <button class="btn btn-sm btn-outline-danger py-0 mb-2" onclick="likePost('${post.id}', ${post.likes || 0})">❤️ ${post.likes || 0}</button>
+                    
+                    <div id="replies-list-${post.id}" class="d-flex flex-column gap-1 mb-2"></div>
+                    
+                    <div class="input-group input-group-sm">
+                        <input type="text" id="reply-input-${post.id}" class="form-control" placeholder="Write a reply...">
+                        <button class="btn btn-accent btn-sm" onclick="addReply('${post.id}')">Send</button>
+                    </div>
+                </div>
+            `;
+        });
+        listEl.innerHTML = html;
+        posts.forEach((post) => listenToReplies(post.id));
+    }
+
+    function listenToAnalysisPosts() {
+        db.ref("analysis_posts").limitToLast(20).on("value", (snapshot) => {
+            const posts = [];
+            snapshot.forEach((child) => {
+                posts.unshift({ id: child.key, ...child.val() });
+            });
+            allAnalysisPosts = posts;
+            renderAnalysisTagRow();
+            renderAnalysisPostsList();
+        });
+    }
+
+    function listenToReplies(postId) {
+        db.ref(`analysis_posts/${postId}/replies`).on("value", (snapshot) => {
+            const container = document.getElementById(`replies-list-${postId}`);
+            if (!container) return;
+
+            let html = "";
+            snapshot.forEach((child) => {
+                const r = child.val();
+                const avatarUrl = r.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(r.author)}`;
+                html += `
+                    <div class="comment-box d-flex align-items-center gap-2">
+                        <img src="${avatarUrl}" class="avatar-sm">
+                        <div>
+                            <strong class="accent-text">${r.author}:</strong> ${r.text}
+                        </div>
+                    </div>`;
+            });
+            container.innerHTML = html;
+        });
+    }
+
+    function likePost(postId, currentLikes) { 
+        db.ref(`analysis_posts/${postId}/likes`).set(currentLikes + 1); 
+    }
+
+    async function addReply(postId) {
+        const input = document.getElementById(`reply-input-${postId}`);
+        const msgText = input.value.trim();
+        const user = auth.currentUser;
+
+        if (!msgText || !user) return;
+
+        const authorName = user.displayName || user.email.split('@')[0];
+        const avatar = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}`;
+
+        try {
+            await db.ref(`analysis_posts/${postId}/replies`).push({
+                author: authorName,
+                avatar: avatar,
+                text: msgText,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+            input.value = "";
+
+            const postSnap = await db.ref(`analysis_posts/${postId}`).once('value');
+            const post = postSnap.val();
+            if (post && post.uid && post.uid !== user.uid) {
+                await db.ref(`notifications/${post.uid}`).push({
+                    type: "reply",
+                    postId: postId,
+                    fromName: authorName,
+                    fromAvatar: avatar,
+                    text: msgText,
+                    symbol: post.symbol || "",
+                    read: false,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP
+                });
+            }
+        } catch (err) {
+            toast("Reply failed: " + err.message, "error");
+        }
+    }
+
+    // ============ PHASE 2: ONLINE PRESENCE ============
+    function setupPresence(uid) {
+        const myPresenceRef = db.ref(`presence/${uid}`);
+        db.ref('.info/connected').on('value', (snap) => {
+            if (snap.val() === true) {
+                myPresenceRef.onDisconnect().remove();
+                myPresenceRef.set(true);
+            }
+        });
+        db.ref('presence').on('value', (snap) => {
+            const count = snap.exists() ? snap.numChildren() : 0;
+            const el = document.getElementById("online-users-count");
+            if (el) el.innerText = Math.max(count, 1);
+        });
+    }
+
+    // ============ PHASE 3: PRICE ALERTS ============
+    let userPriceAlerts = [];
+    let alertPollingStarted = false;
+
+    function listenToPriceAlerts(uid) {
+        db.ref(`price_alerts/${uid}`).on('value', (snapshot) => {
+            const items = [];
+            snapshot.forEach(child => items.push({ id: child.key, ...child.val() }));
+            userPriceAlerts = items;
+            renderAlertsList();
+        });
+    }
+
+    function renderAlertsList() {
+        const container = document.getElementById("alerts-list-container");
+        if (!container) return;
+        const active = userPriceAlerts.filter(a => !a.triggered);
+        if (!active.length) {
+            container.innerHTML = `<p class="small text-faint">No active alerts yet.</p>`;
+            return;
+        }
+        container.innerHTML = active.map(a => `
+            <div class="alert-row">
+                <div>
+                    <strong class="accent-text">${a.symbol}</strong>
+                    <span class="badge-dir text-dim"> ${a.direction === 'above' ? '▲ above' : '▼ below'} ${a.target}</span>
+                </div>
+                <button class="btn btn-sm btn-outline-danger py-0" onclick="deletePriceAlert('${a.id}')">✕</button>
+            </div>
+        `).join("");
+    }
+
+    async function createPriceAlert() {
+        const user = auth.currentUser;
+        if (!user) return;
+        const symbol = document.getElementById("alert-symbol").value.trim().toUpperCase();
+        const direction = document.getElementById("alert-direction").value;
+        const target = parseFloat(document.getElementById("alert-target").value);
+
+        if (!symbol || isNaN(target)) {
+            toast("Please enter a valid symbol and target price", "error");
+            return;
+        }
+
+        await db.ref(`price_alerts/${user.uid}`).push({
+            symbol, direction, target,
+            triggered: false,
+            createdAt: firebase.database.ServerValue.TIMESTAMP
+        });
+        document.getElementById("alert-target").value = "";
+        toast(`Alert set for ${symbol} ${direction} ${target}`, "success");
+    }
+
+    function deletePriceAlert(alertId) {
+        const user = auth.currentUser;
+        if (!user) return;
+        db.ref(`price_alerts/${user.uid}/${alertId}`).remove();
+    }
+
+    function startAlertPolling() {
+        if (alertPollingStarted) return;
+        alertPollingStarted = true;
+        setInterval(checkPriceAlerts, 20000);
+    }
+
+    async function checkPriceAlerts() {
+        const user = auth.currentUser;
+        if (!user) return;
+        const active = userPriceAlerts.filter(a => !a.triggered);
+        if (!active.length) return;
+
+        const uniqueSymbols = [...new Set(active.map(a => a.symbol))];
+        const prices = {};
+        try {
+            for (const sym of uniqueSymbols) {
+                const res = await fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${sym}`);
+                const data = await res.json();
+                prices[sym] = parseFloat(data.markPrice);
+            }
+        } catch (e) { return; }
+
+        for (const alert of active) {
+            const price = prices[alert.symbol];
+            if (!price) continue;
+            const hit = alert.direction === 'above' ? price >= alert.target : price <= alert.target;
+            if (hit) {
+                await db.ref(`price_alerts/${user.uid}/${alert.id}/triggered`).set(true);
+                showBrowserNotification(
+                    `🔔 ${alert.symbol} price alert`,
+                    `${alert.symbol} just went ${alert.direction} ${alert.target} (now ${price})`
+                );
+                toast(`🔔 ${alert.symbol} hit ${alert.target}!`, "success");
+            }
+        }
+    }
+
+    function listenToUserNotifications(uid) {
+        if (notifListenerStarted) return;
+        notifListenerStarted = true;
+
+        const notifRef = db.ref(`notifications/${uid}`).limitToLast(30);
+
+        notifRef.on('value', (snapshot) => {
+            const items = [];
+            let unread = 0;
+            snapshot.forEach((child) => {
+                const n = { id: child.key, ...child.val() };
+                items.unshift(n);
+                if (!n.read) unread++;
+            });
+            renderNotifDropdown(items);
+            updateBadge(document.getElementById("notif-bell-badge"), unread);
+        });
+
+        notifRef.on('child_added', (snap) => {
+            if (!notifInitialLoadDone) return;
+            const n = snap.val();
+            if (n.type === "reply") {
+                showBrowserNotification(
+                    `💬 New reply from ${n.fromName}`,
+                    n.text,
+                    n.fromAvatar
+                );
+                toast(`${n.fromName} replied to your ${n.symbol || ''} analysis`, "info");
+            }
+        });
+
+        notifRef.once('value', () => { setTimeout(() => { notifInitialLoadDone = true; }, 800); });
+    }
+
+    function renderNotifDropdown(items) {
+        const list = document.getElementById("notif-dropdown-list");
+        if (!list) return;
+        if (!items.length) {
+            list.innerHTML = `<div class="notif-empty">No notifications yet</div>`;
+            return;
+        }
+        list.innerHTML = items.map(n => `
+            <div class="notif-item ${n.read ? 'read' : 'unread'}" onclick="openNotifTarget('${n.id}','${n.postId || ''}')">
+                <div class="notif-dot"></div>
+                <div>
+                    <div><strong class="accent-text">${n.fromName || 'Someone'}</strong> replied: <span class="text-light">${(n.text || '').slice(0, 60)}</span></div>
+                    <div class="chat-msg-time">${timeAgo(n.timestamp)}</div>
+                </div>
+            </div>
+        `).join("");
+    }
+
+    function toggleNotifDropdown() {
+        const dd = document.getElementById("notif-dropdown-list");
+        notifDropdownOpen = !notifDropdownOpen;
+        dd.classList.toggle("d-none", !notifDropdownOpen);
+        if (notifDropdownOpen) markAllNotificationsRead();
+    }
+
+    function markAllNotificationsRead() {
+        const user = auth.currentUser;
+        if (!user) return;
+        db.ref(`notifications/${user.uid}`).once('value', (snapshot) => {
+            const updates = {};
+            snapshot.forEach((child) => {
+                if (!child.val().read) updates[`${child.key}/read`] = true;
+            });
+            if (Object.keys(updates).length) {
+                db.ref(`notifications/${user.uid}`).update(updates);
+            }
+        });
+    }
+
+    function openNotifTarget(notifId, postId) {
+        document.getElementById("notif-dropdown-list").classList.add("d-none");
+        notifDropdownOpen = false;
+        const offEl = document.getElementById('analysisOffcanvas');
+        const off = bootstrap.Offcanvas.getOrCreateInstance(offEl);
+        off.show();
+        if (postId) {
+            setTimeout(() => {
+                const card = document.getElementById(`post-card-${postId}`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.style.outline = "2px solid var(--amber)";
+                    setTimeout(() => card.style.outline = "none", 1500);
+                }
+            }, 350);
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        const wrap = document.getElementById('notif-bell-btn');
+        const dd = document.getElementById('notif-dropdown-list');
+        if (!dd || dd.classList.contains('d-none')) return;
+        if (!wrap.contains(e.target) && !dd.contains(e.target)) {
+            dd.classList.add('d-none');
+            notifDropdownOpen = false;
+        }
+    });
+
+    window.onload = function() {
+        previewModal = new bootstrap.Modal(document.getElementById('msgModal'));
+        profileModal = new bootstrap.Modal(document.getElementById('profileModal'));
+
+        const chatOff = document.getElementById('chatOffcanvas');
+        chatOff.addEventListener('shown.bs.offcanvas', () => {
+            chatOffcanvasOpen = true;
+            chatUnreadCount = 0;
+            updateBadge(document.getElementById("chat-unread-badge"), 0);
+        });
+        chatOff.addEventListener('hidden.bs.offcanvas', () => { chatOffcanvasOpen = false; });
+
+        const analysisOff = document.getElementById('analysisOffcanvas');
+        analysisOff.addEventListener('shown.bs.offcanvas', () => {
+            analysisOffcanvasOpen = true;
+            analysisUnreadCount = 0;
+            updateBadge(document.getElementById("analysis-unread-badge"), 0);
+        });
+        analysisOff.addEventListener('hidden.bs.offcanvas', () => { analysisOffcanvasOpen = false; });
+    };
 </script>
 </body>
 </html>
